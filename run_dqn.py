@@ -5,6 +5,8 @@ from algo.dqn_agent import DQNAgent
 from env import *
 import os
 
+# os.environ["PYOPENGL_PLATFORM"] = "osmesa"
+
 gs.init(backend=gs.gpu, precision="32")
 
 task_to_class = {
@@ -50,15 +52,19 @@ def train_dqn(args):
         run(env, agent)
 
 def run(env, agent):
-    num_episodes = 500
+    counter = 0
+    num_episodes = 1
     target_update_interval = 10
     for episode in range(num_episodes):
+        if episode == num_episodes - 1:
+            env.start_recording()
+        
         state = env.reset()
         total_reward = torch.zeros(env.num_envs).to(args.device)
         done_array = torch.tensor([False] * env.num_envs).to(args.device)
-        for step in range(50):
+        for step in range(100):
             action = agent.select_action(state)
-            next_state, reward, done = env.step(action)
+            next_state, reward, done = env.step(action, counter)
             agent.memory.add(state, action, reward, next_state, done)
             agent.train()
 
@@ -68,10 +74,15 @@ def run(env, agent):
             if done_array.all():
                 break
 
+            counter += 1
+
         if episode % target_update_interval == 0:
             agent.update_target_network()
             agent.save_checkpoint()
         print(f"Episode {episode}, Total Reward: {total_reward}")
+
+        if episode == num_episodes - 1:
+            env.stop_recording()
 
 def arg_parser():
     parser = argparse.ArgumentParser()

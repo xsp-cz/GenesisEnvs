@@ -16,31 +16,81 @@ class WaterFrankaEnv:
                 substeps=10,
             ),
             sph_options=gs.options.SPHOptions(
-                lower_bound=(0.5, -0.15, 0.0),
-                upper_bound=(0.8, 0.15, 10.5),
+                lower_bound=(0.3, -0.4, 0.0),
+                upper_bound=(1.3, 0.4, 15.0),
                 particle_size=0.01,
             ),
             vis_options=gs.options.VisOptions(
                 visualize_sph_boundary=True,
+                show_world_frame = True,
+                world_frame_size = 1.0,
+                show_link_frame  = False,
+                show_cameras     = False,
+                plane_reflection = True,
+                ambient_light    = (0.1, 0.1, 0.1),
             ),
             show_viewer=vis,
+            renderer=gs.renderers.RayTracer(),
+            viewer_options = gs.options.ViewerOptions(
+                res           = (1280, 960),
+                camera_pos    = (3.5, 0.0, 2.5),
+                camera_lookat = (0.0, 0.0, 0.5),
+                camera_fov    = 40,
+                max_FPS       = 60,
+            ),
         )
         self.plane = self.scene.add_entity(
             gs.morphs.Plane(),
         )
         self.franka = self.scene.add_entity(
-            # gs.morphs.MJCF(file="../assets/xml/franka_emika_panda/panda.xml"),
-            gs.morphs.URDF(file="../assets/urdf/panda_bullet/panda.urdf", fixed=True), 
+            # gs.morphs.MJCF(file="assets/xml/franka_emika_panda/panda.xml"),
+            gs.morphs.MJCF(file="assets/xml/franka_emika_panda/panda_with_spoon.xml"),
+            # gs.morphs.URDF(file="../assets/urdf/panda_bullet/panda.urdf", fixed=True), 
         )
         self.liquid = self.scene.add_entity(
             material=gs.materials.SPH.Liquid(),
             morph=gs.morphs.Box(
-                pos=(0.65, 0.0, 0.25),
-                size=(0.3, 0.3, 0.5),
+                pos=(0.8, 0.0, 0.15),
+                size=(1.0, 0.8, 0.3),
+            ),
+            surface=gs.surfaces.Water(
+                # color=(0.0, 0.0, 1.0),
+                # opacity=0.5,
+                vis_mode="recon",  # or "recon"
+            ),
+        )
+        self.cam = self.scene.add_camera(
+            res    = (640, 480),
+            pos    = (0.0, 3.0, 2.5),
+            lookat = (0, 0, 0.5),
+            fov    = 30,
+            GUI    = False,
+            spp    = 512,
+        )
+        self.recording = False
+        # 添加漂浮球
+        # self.floating_ball = self.scene.add_entity(
+        #     material=gs.materials.Rigid(rho=500),  # 固体材料
+        #     morph=gs.morphs.Sphere(
+        #         pos=(0.6, 0.1, 0.1),  # 设置球的初始位置
+        #         radius=0.03,           # 设置球的半径
+        #     ),
+        #     surface=gs.surfaces.Default(
+        #         color=(1.0, 0.0, 0.0),  # 红色球
+        #         vis_mode="visual",    # 可视化为粒子
+        #     ),
+        # )
+        
+        # 添加沉底球
+        self.sinking_ball = self.scene.add_entity(
+            material=gs.materials.Rigid(rho=1500),  # 固体材料
+            morph=gs.morphs.Sphere(
+                pos=(0.65, -0.1, 0.02), # 设置球的初始位置
+                radius=0.01,            # 设置球的半径
             ),
             surface=gs.surfaces.Default(
-                color=(0.0, 0.0, 1.0),
-                vis_mode="particle",  # or "recon"
+                color=(0.0, 1.0, 0.0),  # 绿色球
+                vis_mode="visual",    # 可视化为粒子
             ),
         )
         """
@@ -56,9 +106,9 @@ class WaterFrankaEnv:
     
     def build_env(self):
         self.motors_dof = torch.arange(7).to(self.device)
-        self.fingers_dof = torch.arange(7, 9).to(self.device)
+        # self.fingers_dof = torch.arange(7, 9).to(self.device)
 
-        self.end_effector = self.franka.get_link("panda_leftfinger")
+        self.end_effector = self.franka.get_link("spoon")
 
         self.pos = torch.tensor([0.65, 0.0, 0.135], dtype=torch.float32, device=self.device)
         self.quat = torch.tensor([0, 1, 0, 0], dtype=torch.float32, device=self.device)
@@ -68,29 +118,50 @@ class WaterFrankaEnv:
             quat = self.quat,
         )
 
+        # # 检查 qpos 的形状
+        # print("qpos shape:", self.qpos.shape)
+        # print("qpos:", self.qpos)
+
+        # # 检查机械臂的自由度数
+        # print("Number of DOFs:", self.franka.n_dofs)
+
         franka_lower_limits, franka_upper_limits = self.franka.get_dofs_limit()
         self.qpos = 0.7 * (franka_upper_limits + franka_lower_limits)
 
         self.franka.set_qpos(self.qpos)
         self.scene.step()
-        self.franka.control_dofs_position(self.qpos[:-2], self.motors_dof)
+        self.franka.control_dofs_position(self.qpos, self.motors_dof)
 
     def reset(self):
         self.build_env()
-        gripper_position = (self.franka.get_link("panda_leftfinger").get_pos() + self.franka.get_link("panda_rightfinger").get_pos()) / 2
-        states = torch.tensor(gripper_position, device=self.device).unsqueeze(0)
+        gripper_position = self.franka.get_link("spoon").get_pos()  # 使用 spoon 的位置
+        states = gripper_position.clone().detach().unsqueeze(0).to(self.device)  # 修复 UserWarning
         return states
 
-    def step(self, actions):
+    def start_recording(self):
+        self.cam.start_recording()
+        self.recording = True
+
+    def stop_recording(self):
+        self.cam.stop_recording(save_to_filename='video.mp4', fps=60)
+        self.recording = False
+
+    def step(self, actions, i):
         if actions is None:
             self.scene.step()
             return None
-        finger_pos = torch.tensor([0.04, 0.04], device=self.device)
+        # finger_pos = torch.tensor([0.04, 0.04], device=self.device)
+        spoon_pos = self.franka.get_link("spoon").get_pos()  # 勺子的位置
+        ball_pos = self.sinking_ball.get_pos()       # 沉底球的位置
+
+        distance_0 = torch.norm(spoon_pos - ball_pos)
+        height_0 = ball_pos[2]
+
         pos = self.pos.clone()
         if actions == 1: # Close gripper
-            finger_pos[:] = 0
+            pass
         elif actions == 2: # Lift gripper 
-            finger_pos[:] = 0
+            # finger_pos[:] = 0
             pos[2] = 1.0
         elif actions == 3: # Lower gripper
             pos[2] = 0
@@ -110,17 +181,45 @@ class WaterFrankaEnv:
             quat=self.quat,
         )
 
-        self.franka.control_dofs_position(self.qpos[:-2], self.motors_dof)
-        self.franka.control_dofs_position(finger_pos, self.fingers_dof)
+        self.franka.control_dofs_position(self.qpos, self.motors_dof)
+        # self.franka.control_dofs_position(finger_pos, self.fingers_dof)
         self.scene.step()
 
-        gripper_position = (self.franka.get_link("panda_leftfinger").get_pos() + self.franka.get_link("panda_rightfinger").get_pos()) / 2
-        states = torch.tensor(gripper_position, device=self.device).unsqueeze(0)
+        gripper_position = (self.franka.get_link("spoon").get_pos() + self.franka.get_link("right_finger").get_pos()) / 2
+        states = gripper_position.clone().detach().unsqueeze(0).to(self.device)
 
-        rewards = self.liquid.get_particles()[:, 2].max() 
+        # rewards = self.liquid.get_particles()[:, 2].max() 
+        # 获取勺子和沉底球的位置
+        spoon_pos = self.franka.get_link("spoon").get_pos()  # 勺子的位置
+        ball_pos = self.sinking_ball.get_pos()       # 沉底球的位置
+
+        # 计算勺子和球之间的距离
+        height = ball_pos[2]
+        distance = torch.norm(spoon_pos - ball_pos)  # 欧几里得距离
+
+        # 定义奖励：距离越小奖励越高
+        # threshold_distance = 0.01
+        # if distance >= threshold_distance:
+        #     rewards = torch.exp(-distance)  # 距离越小奖励越高
+        # else:
+        #     rewards = ball_pos[2]
+        # rewards = 100.0 * (distance_0 - distance)  + 1000.0 * (height - height_0)
+        # rewards = 100.0 * (distance_0 - distance)
+        threshold_dist = 0.01
+        if distance > threshold_dist:
+            rewards = 100 * (distance_0 - distance)
+        else:
+            rewards = 100 * (distance_0 - distance) + 1000 * (height - height_0)
         dones = False
         rewards = torch.tensor([rewards], device=self.device)
         dones = torch.tensor([dones], device=self.device)
+        if self.recording:
+            # self.cam.set_pose(
+            #     pos    = (3.0 * np.sin(i / 60), 3.0 * np.cos(i / 60), 2.5),
+            #     lookat = (0, 0, 0.5),
+            # )
+            self.cam.render()
+        
         return states, rewards, dones
 
 if __name__ == "__main__":

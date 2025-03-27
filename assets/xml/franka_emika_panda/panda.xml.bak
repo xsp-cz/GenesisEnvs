@@ -1,4 +1,4 @@
-<mujoco model="panda" >
+<mujoco model="panda">
   <compiler angle="radian" meshdir="assets" autolimits="true"/>
 
   <option integrator="implicitfast"/>
@@ -42,9 +42,6 @@
     <material class="panda" name="black" rgba="0.25 0.25 0.25 1"/>
     <material class="panda" name="green" rgba="0 1 0 1"/>
     <material class="panda" name="light_blue" rgba="0.039216 0.541176 0.780392 1"/>
-
-    <!-- Spoon mesh -->
-    <mesh name="spoon_mesh" file="C:\Users\luyingxi\Desktop\GenesisEnvs\assets\xml\franka_emika_panda\assets\spoon.obj" scale="0.07 0.07 0.07"/>
 
     <!-- Collision meshes -->
     <mesh name="link0_c" file="link0.stl"/>
@@ -224,11 +221,11 @@
                         <geom mesh="finger_0" material="off_white" class="visual"/>
                         <geom mesh="finger_1" material="black" class="visual"/>
                         <geom mesh="finger_0" class="collision"/>
-                        <geom class="fingertip_pad_collision_1" name="finger_collision_1_left"/>
-                        <geom class="fingertip_pad_collision_2" name="finger_collision_2_left"/>
-                        <geom class="fingertip_pad_collision_3" name="finger_collision_3_left"/>
-                        <geom class="fingertip_pad_collision_4" name="finger_collision_4_left"/>
-                        <geom class="fingertip_pad_collision_5" name="finger_collision_5_left"/>
+                        <geom class="fingertip_pad_collision_1"/>
+                        <geom class="fingertip_pad_collision_2"/>
+                        <geom class="fingertip_pad_collision_3"/>
+                        <geom class="fingertip_pad_collision_4"/>
+                        <geom class="fingertip_pad_collision_5"/>
                       </body>
                       <body name="right_finger" pos="0 0 0.0584" quat="0 0 0 1">
                         <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
@@ -236,11 +233,11 @@
                         <geom mesh="finger_0" material="off_white" class="visual"/>
                         <geom mesh="finger_1" material="black" class="visual"/>
                         <geom mesh="finger_0" class="collision"/>
-                        <geom class="fingertip_pad_collision_1" name="finger_collision_1_right"/>
-                        <geom class="fingertip_pad_collision_2" name="finger_collision_2_right"/>
-                        <geom class="fingertip_pad_collision_3" name="finger_collision_3_right"/>
-                        <geom class="fingertip_pad_collision_4" name="finger_collision_4_right"/>
-                        <geom class="fingertip_pad_collision_5" name="finger_collision_5_right"/>
+                        <geom class="fingertip_pad_collision_1"/>
+                        <geom class="fingertip_pad_collision_2"/>
+                        <geom class="fingertip_pad_collision_3"/>
+                        <geom class="fingertip_pad_collision_4"/>
+                        <geom class="fingertip_pad_collision_5"/>
                       </body>
                     </body>
                   </body>
@@ -251,25 +248,7 @@
         </body>
       </body>
     </body>
-    <body name="spoon" pos="0.085 0.005 0.78" quat="0 0 0 1">
-      <freejoint/>
-      <geom name="spoon_geom" type="mesh" mesh="spoon_mesh" mass="0.2" rgba="0.8 0.8 0.8 1"/>
-    </body>
   </worldbody>
-
-  <contact>
-    <!-- 夹爪（碰撞几何体）与勺子的接触 -->
-    <pair geom1="finger_collision_1_left" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_2_left" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_3_left" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_4_left" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_5_left" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_1_right" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_2_right" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_3_right" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_4_right" geom2="spoon_geom"/>
-    <pair geom1="finger_collision_5_right" geom2="spoon_geom"/>
-  </contact>
 
   <tendon>
     <fixed name="split">
@@ -278,12 +257,8 @@
     </fixed>
   </tendon>
 
-  <!-- <equality>
-    <joint joint1="finger_joint1" joint2="finger_joint2" solimp="0.95 0.99 0.001" solref="0.005 1"/>
-  </equality> -->
-
   <equality>
-  <weld name="grasp_constraint" body1="left_finger" body2="spoon" solref="0.02 1"/>
+    <joint joint1="finger_joint1" joint2="finger_joint2" solimp="0.95 0.99 0.001" solref="0.005 1"/>
   </equality>
 
   <actuator>
@@ -303,6 +278,6 @@
   </actuator>
 
   <keyframe>
-    <key name="home" qpos="-0.18 0 0 -0.52 0 0.586 0.927 0.02 0.02 0 0 0 1 0 0 0" ctrl="-0.18 0 0 -0.52 0 0.586 0.927 0.01"/>
+    <key name="home" qpos="0 0 0 -1.57079 0 1.57079 -0.7853 0.04 0.04" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255"/>
   </keyframe>
 </mujoco>
